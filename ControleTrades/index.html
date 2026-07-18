@@ -293,7 +293,7 @@
 <main>
   <div class="banner">
     <div>💡</div>
-    <div><strong>Ambiente de teste conectado ao site.</strong> Os dados vivem apenas nesta sessão do navegador — use <strong>Exportar</strong> (na aba Cadastros) para salvar suas operações em arquivo e <strong>Importar</strong> para recarregar. Login real, banco de dados e cotação em tempo real entram nas próximas fases. Passe o mouse nos ícones <span class="hint" data-tip="Assim como este, vários campos têm explicações rápidas para o sistema ser autoexplicativo.">?</span> para ver as explicações.</div>
+    <div><strong>Ambiente de teste conectado ao site.</strong> Suas operações são salvas automaticamente <strong>neste navegador</strong> (sobrevivem a F5 e a fechar a aba) — mas ficam só neste computador/navegador, então use <strong>Exportar</strong> (na aba Cadastros) de vez em quando para ter um backup em arquivo, principalmente antes de limpar o navegador ou trocar de máquina. Login real e banco de dados na nuvem entram nas próximas fases. Passe o mouse nos ícones <span class="hint" data-tip="Assim como este, vários campos têm explicações rápidas para o sistema ser autoexplicativo.">?</span> para ver as explicações.</div>
   </div>
 
   <!-- ============ DASHBOARD ============ -->
@@ -1039,7 +1039,33 @@ function pnlCell(v){
    via GET /sync — sem exportar/importar arquivo. Os trades chegam com
    pending:true/mirror/mirrorOf/tcId, então caem direto na MESMA fila de
    validação já existente; account (nome) resolve/cria a firm localmente. */
-const SYNC_KEY = 'tc_sync_config'; // só config de conexão fica no localStorage — trades continuam via Exportar/Importar
+const SYNC_KEY = 'tc_sync_config'; // config de conexão com o servidor do Trade Copier
+const LOCAL_STATE_KEY = 'ts_state_v1'; // todo o estado (trades, contas, cadastros) auto-salvo neste navegador
+
+function saveStateLocally(){
+  try{ localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(state)); }
+  catch(e){ /* quota cheia ou navegação privada — Exportar/Importar continua funcionando */ }
+}
+function loadStateLocally(){
+  try{
+    const raw = localStorage.getItem(LOCAL_STATE_KEY);
+    if(!raw) return false;
+    const saved = JSON.parse(raw);
+    if(!saved || !Array.isArray(saved.trades)) return false;
+    if(!saved.opTypes) saved.opTypes=[{name:'Day Trade'},{name:'Swing Trade'},{name:'Opções'}];
+    if(!saved.prefs) saved.prefs={...DEFAULT_PREFS};
+    if(!saved.favs) saved.favs={fut:[], stk:[]};
+    if(!saved.cashflows) saved.cashflows=[];
+    if(!saved.boxes) saved.boxes=[];
+    if(!saved.techs) saved.techs=[];
+    if(!saved.dismissedTcIds) saved.dismissedTcIds=[];
+    saved.techs = normNamed(saved.techs);
+    saved.opTypes = normNamed(saved.opTypes);
+    if(saved.seq==null) saved.seq=1;
+    state = saved;
+    return true;
+  }catch(e){ return false; }
+}
 
 function loadSyncConfig(){
   try{
@@ -1253,9 +1279,11 @@ async function loadStateFromServer(){
 }
 
 function scheduleSave(){
+  saveStateLocally(); // sempre grava neste navegador, com ou sem servidor configurado
+
   const server = $('#sync-server') && $('#sync-server').value.trim().replace(/\/+$/,'');
   const token  = $('#sync-token') && $('#sync-token').value.trim();
-  if(!server || !token) return; // sem servidor configurado, não há onde salvar
+  if(!server || !token) return; // sem servidor configurado, o auto-save local acima já é suficiente
 
   clearTimeout(saveTimer);
   setSaveStatus('💾 Salvando…');
@@ -3403,7 +3431,7 @@ $('#btn-export').addEventListener('click',()=>{
   const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='primetrust-trades-'+new Date().toISOString().slice(0,10)+'.json';
+  a.download='traderstack-trades-'+new Date().toISOString().slice(0,10)+'.json';
   a.click(); URL.revokeObjectURL(a.href);
   toast('⬇️ Dados exportados');
 });
@@ -3437,9 +3465,10 @@ function renderAll(){ renderPending(); renderDash(); renderOpen(); renderClosed(
   $('#f-date').value = new Date().toISOString().slice(0,10);
   $('#stocklist').innerHTML = Object.entries(STOCKS).map(([tk,nm])=>`<option value="${tk}">${esc(nm)}</option>`).join('');
   loadSyncConfig();
-  // Carrega o estado salvo no servidor ANTES do primeiro render/salvamento — evita
-  // que um render inicial (com o estado vazio local) dispare um save que sobrescreva
-  // dados já salvos no servidor antes de eles serem carregados.
+  // Carrega primeiro o que está salvo neste navegador (localStorage) e, se houver
+  // servidor do Trade Copier configurado, deixa o estado do servidor sobrescrever —
+  // assim o servidor sempre vence quando existe, mas o navegador local é o padrão.
+  loadStateLocally();
   await loadStateFromServer();
   refreshFormSelects();
   renderPrefs(); applyPrefs(); updateMode();
