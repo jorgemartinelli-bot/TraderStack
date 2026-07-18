@@ -1,0 +1,14 @@
+# Este repositório é só para o site + app de teste da TraderStack.
+# Os demais projetos da pasta (indicadores, copier, replicador) ficam de fora por padrão.
+AnaliseMercado/
+Replicador/
+TradeCopier/
+*.pine
+*.cs
+
+# Lixo comum de SO/editor
+.DS_Store
+Thumbs.db
+
+# Config local do Claude Code (não é para o repo público)
+.claude/

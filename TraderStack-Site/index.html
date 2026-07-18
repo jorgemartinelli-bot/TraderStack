@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraderStack — The full stack for funded traders</title>
+<meta name="description" content="Copy trades across every account, size positions instantly, enforce your risk rules, and let AI review every trade. One subscription, the whole stack.">
+<link rel="icon" href="assets/favicon.ico">
+<meta property="og:title" content="TraderStack — The full stack for funded traders">
+<meta property="og:description" content="Trade copier, position sizing, risk management and AI trade review — in one stack.">
+<meta property="og:image" content="assets/og-image-1200x630.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,300..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0F16;
+    --panel: #0D1520;
+    --panel-2: #101B29;
+    --line: #1C2836;
+    --line-soft: #16202D;
+    --text: #F2F5F4;
+    --muted: #8FA0AE;
+    --faint: #5C6B7A;
+    --green: #1FCE8F;
+    --green-deep: #00A86B;
+    --green-dim: rgba(31, 206, 143, 0.12);
+    --red: #F0544F;
+    --amber: #E8A33D;
+    --sans: "Archivo", "Segoe UI", -apple-system, sans-serif;
+    --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  img, svg, canvas { max-width: 100%; display: block; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: var(--mono); }
+
+  /* ============ NAV ============ */
+  header.nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10, 15, 22, 0.82); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .nav-inner {
+    display: flex; align-items: center; gap: 32px;
+    height: 64px; max-width: 1160px; margin: 0 auto; padding: 0 24px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .logo-word { font-size: 19px; letter-spacing: -0.02em; }
+  .logo-word b { font-weight: 800; }
+  .logo-word span { font-weight: 450; }
+  nav.links { display: flex; gap: 26px; margin-left: auto; }
+  nav.links a { color: var(--muted); font-size: 14.5px; font-weight: 500; transition: color .15s; }
+  nav.links a:hover, nav.links a:focus-visible { color: var(--text); }
+  .nav-cta { display: flex; gap: 12px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--sans); font-weight: 650; font-size: 15px;
+    border-radius: 10px; padding: 10px 20px; cursor: pointer;
+    border: 1px solid transparent; transition: transform .12s, background .15s, border-color .15s;
+  }
+  .btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .btn-ghost { color: var(--text); border-color: var(--line); background: transparent; }
+  .btn-ghost:hover { border-color: var(--muted); }
+  .btn-green { background: var(--green); color: #062018; }
+  .btn-green:hover { background: #3BD9A0; transform: translateY(-1px); }
+  .btn-big { padding: 14px 28px; font-size: 16px; }
+  @media (max-width: 860px) { nav.links { display: none; } }
+
+  /* ============ HERO ============ */
+  .hero { padding: 88px 0 64px; position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 900px 420px at 78% 8%, rgba(31,206,143,0.07), transparent 60%),
+      repeating-linear-gradient(to right, transparent 0 119px, rgba(28,40,54,0.35) 119px 120px);
+  }
+  .hero-grid {
+    position: relative; display: grid; grid-template-columns: 1fr 1fr;
+    gap: 56px; align-items: center;
+  }
+  @media (max-width: 980px) { .hero-grid { grid-template-columns: 1fr; } }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+    letter-spacing: 0.16em; color: var(--green); text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+  }
+  .eyebrow::before { content: ""; width: 28px; height: 1px; background: var(--green); }
+  h1 {
+    font-size: clamp(38px, 5.2vw, 58px); font-weight: 800;
+    letter-spacing: -0.03em; line-height: 1.06; text-wrap: balance;
+    font-stretch: 95%;
+  }
+  h1 .g { color: var(--green); }
+  .hero p.sub { color: var(--muted); font-size: 18px; max-width: 54ch; margin: 22px 0 32px; }
+  .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .hero-note { font-family: var(--mono); font-size: 12.5px; color: var(--faint); margin-top: 16px; }
+
+  /* ============ TERMINAL MOCK ============ */
+  .terminal {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(31,206,143,0.04);
+    overflow: hidden; font-family: var(--mono);
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    border-bottom: 1px solid var(--line-soft); background: var(--panel-2);
+  }
+  .term-bar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .term-bar .dot.g { background: var(--green-deep); }
+  .term-title { margin-left: 8px; font-size: 12px; color: var(--faint); }
+  .term-body { padding: 16px; display: grid; gap: 14px; }
+  .term-row-top { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .stat {
+    background: var(--panel-2); border: 1px solid var(--line-soft);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .stat .k { font-size: 10.5px; color: var(--faint); letter-spacing: 0.08em; text-transform: uppercase; }
+  .stat .v { font-size: 18px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .stat .v.up { color: var(--green); }
+  .acc-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .acc-table th {
+    text-align: left; color: var(--faint); font-weight: 500; font-size: 10.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .acc-table td { padding: 9px 8px; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+  .acc-table tr:last-child td { border-bottom: 0; }
+  .chip {
+    display: inline-block; font-size: 10.5px; padding: 2px 9px; border-radius: 999px;
+    background: var(--green-dim); color: var(--green); font-weight: 500;
+  }
+  .chip.lead { background: rgba(232,163,61,0.14); color: var(--amber); }
+  .pnl.up { color: var(--green); } .pnl.down { color: var(--red); }
+  .riskbar { height: 5px; border-radius: 3px; background: var(--line-soft); overflow: hidden; min-width: 70px; }
+  .riskbar i { display: block; height: 100%; border-radius: 3px; background: var(--green-deep); }
+  .riskbar i.warn { background: var(--amber); }
+  .term-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--faint); padding-top: 2px;
+  }
+  .pulse { display: inline-flex; align-items: center; gap: 7px; color: var(--green); }
+  .pulse::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* ============ PLATFORM STRIP ============ */
+  .strip { border-block: 1px solid var(--line-soft); padding: 22px 0; }
+  .strip-inner {
+    display: flex; gap: 40px; align-items: center; justify-content: center; flex-wrap: wrap;
+  }
+  .strip .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--faint); text-transform: uppercase; }
+  .strip .pf { color: var(--muted); font-weight: 650; font-size: 15px; letter-spacing: 0.01em; opacity: 0.85; }
+
+  /* ============ SECTIONS ============ */
+  section.block { padding: 96px 0 0; }
+  .sec-head { max-width: 640px; margin-bottom: 48px; }
+  h2 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.12; text-wrap: balance; }
+  .sec-head p { color: var(--muted); font-size: 17px; margin-top: 14px; }
+
+  .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 960px) { .feat-grid { grid-template-columns: 1fr; } }
+  .feat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 28px 26px; display: flex; flex-direction: column; gap: 12px;
+    transition: border-color .2s, transform .2s;
+  }
+  .feat:hover { border-color: rgba(31,206,143,0.35); transform: translateY(-3px); }
+  .feat .ic {
+    width: 42px; height: 42px; border-radius: 10px; background: var(--green-dim);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .feat h3 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .feat p { color: var(--muted); font-size: 15px; }
+  .feat .tag { font-family: var(--mono); font-size: 11px; color: var(--green); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  /* ============ CALCULATOR ============ */
+  .calc-wrap {
+    display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center;
+  }
+  @media (max-width: 960px) { .calc-wrap { grid-template-columns: 1fr; } }
+  .calc {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 28px; font-family: var(--mono);
+  }
+  .calc h3 { font-family: var(--sans); font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+  .calc .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .calc label { display: block; font-size: 11px; color: var(--faint); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+  .calc select, .calc input {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); font-family: var(--mono); font-size: 15px;
+    border-radius: 9px; padding: 10px 12px;
+  }
+  .calc select:focus, .calc input:focus { outline: none; border-color: var(--green-deep); }
+  .calc-out {
+    margin-top: 20px; border-top: 1px dashed var(--line); padding-top: 20px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center;
+  }
+  .calc-out .big {
+    font-size: 44px; font-weight: 700; color: var(--green); line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-out .big small { font-size: 14px; color: var(--muted); font-weight: 400; display: block; margin-top: 6px; }
+  .calc-out .detail { font-size: 12.5px; color: var(--muted); line-height: 1.8; }
+  .calc-out .detail b { color: var(--text); font-weight: 500; }
+
+  /* ============ SPLIT FEATURES ============ */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; margin-top: 64px; }
+  @media (max-width: 960px) { .split { grid-template-columns: 1fr; } .split.rev .txt { order: -1; } }
+  .split .txt h3 { font-size: 26px; font-weight: 750; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .split .txt p { color: var(--muted); font-size: 16px; }
+  .split ul { list-style: none; padding: 0; margin-top: 18px; display: grid; gap: 10px; }
+  .split ul li { display: flex; gap: 12px; align-items: flex-start; color: var(--muted); font-size: 15px; }
+  .split ul li::before {
+    content: "✓"; color: var(--green); font-weight: 700; font-family: var(--mono);
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .panel-mock {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; font-family: var(--mono); font-size: 12.5px;
+  }
+  .pm-title { font-size: 11px; color: var(--faint); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; }
+  .pm-line { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+  .pm-line:last-child { border-bottom: 0; }
+  .pm-line .l { color: var(--muted); }
+  .ai-note {
+    background: var(--green-dim); border: 1px solid rgba(31,206,143,0.25);
+    border-radius: 10px; padding: 14px 16px; margin-top: 14px;
+    color: var(--text); font-size: 12.5px; line-height: 1.7;
+  }
+  .ai-note .who { color: var(--green); font-weight: 700; letter-spacing: 0.08em; font-size: 10.5px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+
+  /* ============ PRICING ============ */
+  .prices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: stretch; }
+  @media (max-width: 960px) { .prices { grid-template-columns: 1fr; } }
+  .price {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 30px 28px; display: flex; flex-direction: column; gap: 0;
+  }
+  .price.pop { border-color: var(--green-deep); position: relative; background: linear-gradient(180deg, rgba(31,206,143,0.06), transparent 40%), var(--panel); }
+  .price .pop-tag {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: var(--green); color: #062018; font-family: var(--mono);
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 14px; border-radius: 999px;
+  }
+  .price h3 { font-size: 17px; font-weight: 700; }
+  .price .amount { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; margin: 14px 0 2px; font-variant-numeric: tabular-nums; }
+  .price .amount span { font-size: 15px; font-weight: 450; color: var(--muted); letter-spacing: 0; }
+  .price .for { color: var(--faint); font-size: 13.5px; margin-bottom: 22px; }
+  .price ul { list-style: none; padding: 0; display: grid; gap: 10px; margin-bottom: 28px; }
+  .price ul li { display: flex; gap: 11px; color: var(--muted); font-size: 14.5px; align-items: flex-start; }
+  .price ul li::before { content: "✓"; color: var(--green); font-family: var(--mono); font-weight: 700; flex-shrink: 0; }
+  .price ul li.mut { opacity: 0.45; } .price ul li.mut::before { content: "—"; color: var(--faint); }
+  .price .btn { margin-top: auto; width: 100%; }
+  .price-note { text-align: center; color: var(--faint); font-family: var(--mono); font-size: 12.5px; margin-top: 22px; }
+  .price-note b { color: var(--green); font-weight: 500; }
+
+  /* ============ COUPON BANNER ============ */
+  .coupon {
+    margin-top: 96px; border-radius: var(--radius); border: 1px solid var(--line);
+    background: linear-gradient(120deg, rgba(31,206,143,0.09), transparent 55%), var(--panel);
+    padding: 40px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 32px; align-items: center;
+  }
+  @media (max-width: 860px) { .coupon { grid-template-columns: 1fr; } }
+  .coupon h3 { font-size: 24px; font-weight: 750; letter-spacing: -0.02em; margin-bottom: 10px; }
+  .coupon p { color: var(--muted); font-size: 15.5px; }
+  .coupon .code {
+    font-family: var(--mono); background: var(--panel-2); border: 1px dashed var(--green-deep);
+    border-radius: 10px; padding: 18px 22px; text-align: center;
+  }
+  .coupon .code .lbl { font-size: 11px; color: var(--faint); letter-spacing: 0.12em; text-transform: uppercase; }
+  .coupon .code .val { font-size: 24px; font-weight: 700; color: var(--green); letter-spacing: 0.06em; margin-top: 4px; }
+
+  /* ============ CTA + FOOTER ============ */
+  .final-cta { text-align: center; padding: 110px 0 90px; }
+  .final-cta h2 { max-width: 620px; margin: 0 auto 16px; }
+  .final-cta p { color: var(--muted); margin-bottom: 32px; }
+  footer {
+    border-top: 1px solid var(--line-soft); padding: 40px 0 48px;
+    color: var(--faint); font-size: 13px;
+  }
+  .foot-grid { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
+  .foot-links { display: flex; gap: 22px; }
+  .foot-links a { color: var(--muted); } .foot-links a:hover { color: var(--text); }
+  .disclaimer { font-size: 11.5px; line-height: 1.7; color: var(--faint); max-width: 90ch; }
+
+  /* ============ MODAL ============ */
+  dialog#login-modal {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 36px; max-width: 400px; width: 92%;
+  }
+  dialog#login-modal::backdrop { background: rgba(4, 8, 12, 0.7); backdrop-filter: blur(3px); }
+  #login-modal h3 { font-size: 20px; font-weight: 750; margin-bottom: 8px; }
+  #login-modal p { color: var(--muted); font-size: 14.5px; margin-bottom: 22px; }
+  #login-modal .btn { width: 100%; }
+
+  /* ============ REVEAL ============ */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="#top" aria-label="TraderStack home">
+      <svg width="30" height="30" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="10" y="42" width="10" height="12" rx="3" fill="#F2F5F4"/>
+        <rect x="27" y="42" width="10" height="12" rx="3" fill="#F2F5F4"/>
+        <rect x="27" y="27" width="10" height="12" rx="3" fill="#F2F5F4"/>
+        <rect x="44" y="42" width="10" height="12" rx="3" fill="#F2F5F4"/>
+        <rect x="44" y="27" width="10" height="12" rx="3" fill="#F2F5F4"/>
+        <rect x="44" y="12" width="10" height="12" rx="3" fill="#1FCE8F"/>
+      </svg>
+      <span class="logo-word"><span>Trader</span><b>Stack</b></span>
+    </a>
+    <nav class="links" aria-label="Main">
+      <a href="#copier">Copier</a>
+      <a href="#risk">Risk Manager</a>
+      <a href="#sizing">Position Sizing</a>
+      <a href="#ai">AI Review</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+    <div class="nav-cta">
+      <button class="btn btn-ghost" id="login-btn" type="button">Log in</button>
+      <a class="btn btn-green" href="#pricing">Start free</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ================= HERO ================= -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">The full stack for funded traders</p>
+        <h1>Every account.<br>Every rule.<br><span class="g">One stack.</span></h1>
+        <p class="sub">Copy trades across all your funded accounts, size every position in one glance, enforce your max loss and profit targets automatically — and let AI review every trade you take.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-green btn-big" href="#pricing">Start free — no card needed</a>
+          <a class="btn btn-ghost btn-big" href="#copier">See how it works</a>
+        </div>
+        <p class="hero-note">// built by funded traders, for funded traders</p>
+      </div>
+
+      <div class="terminal reveal" aria-label="TraderStack dashboard preview">
+        <div class="term-bar">
+          <span class="dot g"></span><span class="dot"></span><span class="dot"></span>
+          <span class="term-title">traderstack — terminal</span>
+        </div>
+        <div class="term-body">
+          <div class="term-row-top">
+            <div class="stat"><div class="k">Net P&amp;L today</div><div class="v up" id="pnl-total">+$1,247.50</div></div>
+            <div class="stat"><div class="k">Accounts copying</div><div class="v">6 / 6</div></div>
+            <div class="stat"><div class="k">Daily loss used</div><div class="v">31%</div></div>
+          </div>
+          <table class="acc-table">
+            <thead><tr><th>Account</th><th>Role</th><th>P&amp;L</th><th>Risk</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Apex — 150K</td><td><span class="chip lead">Leader</span></td>
+                <td class="pnl up" data-pnl="415.00">+$415.00</td>
+                <td><div class="riskbar"><i style="width:28%"></i></div></td>
+              </tr>
+              <tr>
+                <td>Apex — 150K #2</td><td><span class="chip">Copying</span></td>
+                <td class="pnl up" data-pnl="409.50">+$409.50</td>
+                <td><div class="riskbar"><i style="width:29%"></i></div></td>
+              </tr>
+              <tr>
+                <td>Topstep — 100K</td><td><span class="chip">Copying</span></td>
+                <td class="pnl up" data-pnl="271.25">+$271.25</td>
+                <td><div class="riskbar"><i style="width:34%"></i></div></td>
+              </tr>
+              <tr>
+                <td>MFFU — 100K</td><td><span class="chip">Copying</span></td>
+                <td class="pnl down" data-pnl="-88.75">−$88.75</td>
+                <td><div class="riskbar"><i class="warn" style="width:58%"></i></div></td>
+              </tr>
+              <tr>
+                <td>Tradeify — 50K</td><td><span class="chip">Copying</span></td>
+                <td class="pnl up" data-pnl="240.50">+$240.50</td>
+                <td><div class="riskbar"><i style="width:22%"></i></div></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="term-foot">
+            <span class="pulse">copier live — 9 ms avg</span>
+            <span>auto-flatten armed · max loss $1,800</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PLATFORM STRIP ================= -->
+  <div class="strip">
+    <div class="wrap strip-inner">
+      <span class="lbl">Works with</span>
+      <span class="pf">NinjaTrader</span>
+      <span class="pf">Tradovate</span>
+      <span class="pf">Rithmic</span>
+      <span class="pf">TradingView</span>
+      <span class="pf">MetaTrader 5</span>
+      <span class="pf">TradeLocker</span>
+      <span class="pf">OANDA</span>
+    </div>
+  </div>
+
+  <!-- ================= FEATURES OVERVIEW ================= -->
+  <section class="block" id="features">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">The stack</p>
+        <h2>Stop juggling five tools. Control everything from one place.</h2>
+        <p>Every layer of TraderStack replaces something you're paying for — or should be using — today.</p>
+      </div>
+      <div class="feat-grid">
+        <div class="feat reveal">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1FCE8F" stroke-width="2" stroke-linecap="round"><path d="M8 17l4 4 4-4M12 21V9M16 7l-4-4-4 4"/></svg></div>
+          <span class="tag">Copier</span>
+          <h3>One click, every account</h3>
+          <p>Trade your leader account and every mirror follows in milliseconds — across brokers, platforms and prop firms, with per-account contract ratios.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1FCE8F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg></div>
+          <span class="tag">Risk manager</span>
+          <h3>Your rules, enforced</h3>
+          <p>Set max daily loss, max profit lock-in and drawdown guards per account. When a limit hits, TraderStack flattens for you — no willpower required.</p>
+        </div>
+        <div class="feat reveal">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1FCE8F" stroke-width="2" stroke-linecap="round"><path d="M9 7h6M9 11h6M9 15h3M5 3h14a1 1 0 011 1v16a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/></svg></div>
+          <span class="tag">Position sizing</span>
+          <h3>Know your size before you click</h3>
+          <p>Type your risk in dollars and your stop in ticks — get the exact number of contracts for any instrument, instantly. No more oversizing on tilt.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COPIER SPLIT ================= -->
+  <section class="block" id="copier">
+    <div class="wrap">
+      <div class="split">
+        <div class="txt reveal">
+          <p class="eyebrow">Trade copier</p>
+          <h3>Scale one good decision across every account you're funded on.</h3>
+          <p>The edge of funded trading is repetition: pass more evaluations, run more funded accounts, multiply the same trade. TraderStack's copier makes six accounts feel like one.</p>
+          <ul>
+            <li>Leader → mirrors replication across NinjaTrader, Tradovate, Rithmic, MT5, TradeLocker and OANDA</li>
+            <li>Per-account ratio and contract mapping (trade ES on the leader, MES on smaller mirrors)</li>
+            <li>Mirror validation — every fill checked against the leader, divergences flagged immediately</li>
+            <li>Prop-firm-safe: works within evaluation and funded account rules</li>
+          </ul>
+        </div>
+        <div class="panel-mock reveal" aria-label="Copier panel preview">
+          <div class="pm-title">Copier — routing</div>
+          <div class="pm-line"><span class="l">Leader fill</span><span>BUY 3 ES @ 6,412.25</span></div>
+          <div class="pm-line"><span class="l">→ Apex #2 (1:1)</span><span class="pnl up">filled 3 ES · 8 ms</span></div>
+          <div class="pm-line"><span class="l">→ Topstep (ratio 0.5)</span><span class="pnl up">filled 2 ES · 11 ms</span></div>
+          <div class="pm-line"><span class="l">→ MFFU (map MES ×10)</span><span class="pnl up">filled 30 MES · 9 ms</span></div>
+          <div class="pm-line"><span class="l">→ Tradeify (ratio 0.3)</span><span class="pnl up">filled 1 ES · 12 ms</span></div>
+          <div class="pm-line"><span class="l">Validation</span><span class="pnl up">5/5 mirrors in sync ✓</span></div>
+        </div>
+      </div>
+
+      <!-- ================= RISK SPLIT ================= -->
+      <div class="split rev" id="risk">
+        <div class="panel-mock reveal" aria-label="Risk manager preview">
+          <div class="pm-title">Risk manager — today</div>
+          <div class="pm-line"><span class="l">Max daily loss</span><span>$1,800.00</span></div>
+          <div class="pm-line"><span class="l">Used</span><span class="pnl down">$556.25 (31%)</span></div>
+          <div class="pm-line"><span class="l">Profit lock-in</span><span>at +$1,500 → trail $500</span></div>
+          <div class="pm-line"><span class="l">Max contracts</span><span>3 ES / account</span></div>
+          <div class="pm-line"><span class="l">Auto-flatten</span><span class="pnl up">ARMED ✓</span></div>
+          <div class="ai-note">
+            <span class="who">TraderStack guard</span>
+            MFFU account at 58% of daily loss. One more full-size loser hits the limit — mirrors on this account will flatten and pause automatically.
+          </div>
+        </div>
+        <div class="txt reveal">
+          <p class="eyebrow">Account management</p>
+          <h3>Max loss. Max profit. Enforced by software, not discipline.</h3>
+          <p>Most funded traders don't fail the market — they fail one rule, once. TraderStack turns your risk plan into hard limits the platform enforces for you.</p>
+          <ul>
+            <li>Daily max loss with automatic flatten across all linked accounts</li>
+            <li>Profit target lock-in — bank the day when you hit your number</li>
+            <li>Per-account contract caps and session windows (no revenge trading at 3 a.m.)</li>
+            <li>Full daily report of every rule triggered and every dollar saved</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= POSITION SIZING (LIVE) ================= -->
+  <section class="block" id="sizing">
+    <div class="wrap">
+      <div class="calc-wrap">
+        <div class="txt reveal">
+          <p class="eyebrow">Position sizing — try it live</p>
+          <h2 style="font-size: clamp(26px,3vw,34px);">This calculator is real. So is the rest of the stack.</h2>
+          <p style="color: var(--muted); margin-top: 14px;">Risk a fixed dollar amount on every trade and let the math pick your size. Inside TraderStack, this runs against your live account balances and pre-fills your order ticket.</p>
+        </div>
+        <div class="calc reveal">
+          <h3>Contracts calculator</h3>
+          <div class="frow">
+            <div>
+              <label for="c-inst">Instrument</label>
+              <select id="c-inst">
+                <option value="1.25" data-name="MES">MES — Micro S&amp;P (tick $1.25)</option>
+                <option value="12.50" data-name="ES" selected>ES — E-mini S&amp;P (tick $12.50)</option>
+                <option value="0.50" data-name="MNQ">MNQ — Micro Nasdaq (tick $0.50)</option>
+                <option value="5.00" data-name="NQ">NQ — E-mini Nasdaq (tick $5.00)</option>
+                <option value="1.00" data-name="MGC">MGC — Micro Gold (tick $1.00)</option>
+                <option value="10.00" data-name="CL">CL — Crude Oil (tick $10.00)</option>
+              </select>
+            </div>
+            <div>
+              <label for="c-risk">Risk per trade ($)</label>
+              <input id="c-risk" type="number" value="300" min="1" step="25">
+            </div>
+          </div>
+          <div class="frow">
+            <div>
+              <label for="c-stop">Stop size (ticks)</label>
+              <input id="c-stop" type="number" value="8" min="1" step="1">
+            </div>
+            <div>
+              <label for="c-acct">Accounts (mirrors)</label>
+              <input id="c-acct" type="number" value="1" min="1" max="20" step="1">
+            </div>
+          </div>
+          <div class="calc-out">
+            <div class="big" id="c-out">3<small>contracts per account</small></div>
+            <div class="detail" id="c-detail">
+              Risk used: <b>$300.00</b><br>
+              Per contract: <b>$100.00</b><br>
+              Total exposure: <b>$300.00</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= AI SPLIT ================= -->
+  <section class="block" id="ai">
+    <div class="wrap">
+      <div class="split">
+        <div class="txt reveal">
+          <p class="eyebrow">Trades system + AI</p>
+          <h3>An AI that reviews every trade — like a coach who never misses a session.</h3>
+          <p>Every trade you take flows into your TraderStack journal automatically: leader and mirrors, entries, exits, rule hits. Then the AI goes to work on your patterns.</p>
+          <ul>
+            <li>Automatic trade capture and validation — no manual journaling</li>
+            <li>Pattern detection: your best setups, your worst hours, your tilt signature</li>
+            <li>Daily AI debrief with one concrete improvement per session</li>
+            <li>Market context on demand: levels, scenarios and probabilities — education, not signals</li>
+          </ul>
+        </div>
+        <div class="panel-mock reveal" aria-label="AI review preview">
+          <div class="pm-title">AI debrief — Jul 17</div>
+          <div class="pm-line"><span class="l">Trades</span><span>7 (5W / 2L) · +$1,247.50</span></div>
+          <div class="pm-line"><span class="l">Best setup</span><span class="pnl up">Level reclaim — 4W / 0L</span></div>
+          <div class="pm-line"><span class="l">Leak detected</span><span class="pnl down">re-entries after stop</span></div>
+          <div class="ai-note">
+            <span class="who">AI coach</span>
+            Both losers today were re-entries within 4 minutes of a stop-out, against your tested edge. Cutting that one habit would have made today +$1,706. Suggested rule: 10-minute cooldown after any stop — want me to arm it in your Risk Manager?
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PRICING ================= -->
+  <section class="block" id="pricing">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Pricing</p>
+        <h2>Start free. Stack up when you're ready.</h2>
+        <p>Every plan includes partner discounts at 50+ prop firms — for most traders, that alone covers the subscription.</p>
+      </div>
+      <div class="prices">
+        <div class="price reveal">
+          <h3>Starter</h3>
+          <div class="amount">$29<span>/mo</span></div>
+          <p class="for">For traders on their first evaluation</p>
+          <ul>
+            <li>Position size calculator (all futures instruments)</li>
+            <li>TraderStack levels indicator</li>
+            <li>Prop firm coupons &amp; partner discounts</li>
+            <li>Manual trade journal</li>
+            <li class="mut">Trade copier</li>
+            <li class="mut">Risk manager with auto-flatten</li>
+            <li class="mut">AI trade review</li>
+          </ul>
+          <a class="btn btn-ghost" href="#" data-plan="starter">Start free trial</a>
+        </div>
+        <div class="price pop reveal">
+          <span class="pop-tag">Most popular</span>
+          <h3>Pro</h3>
+          <div class="amount">$79<span>/mo</span></div>
+          <p class="for">For funded traders running multiple accounts</p>
+          <ul>
+            <li>Everything in Starter</li>
+            <li>Trade copier — unlimited mirror accounts</li>
+            <li>Risk manager: max loss, profit lock-in, auto-flatten</li>
+            <li>Unified multi-account, multi-firm dashboard</li>
+            <li>Automatic trade capture &amp; mirror validation</li>
+            <li class="mut">AI trade review &amp; daily debrief</li>
+            <li class="mut">AI market context &amp; levels analysis</li>
+          </ul>
+          <a class="btn btn-green" href="#" data-plan="pro">Start free trial</a>
+        </div>
+        <div class="price reveal">
+          <h3>Elite</h3>
+          <div class="amount">$149<span>/mo</span></div>
+          <p class="for">For traders who want the whole stack</p>
+          <ul>
+            <li>Everything in Pro</li>
+            <li>AI trade review with daily debrief</li>
+            <li>AI market context: levels, scenarios, probabilities</li>
+            <li>Tilt detection &amp; behavioral guards</li>
+            <li>Priority support &amp; new layers first</li>
+          </ul>
+          <a class="btn btn-ghost" href="#" data-plan="elite">Start free trial</a>
+        </div>
+      </div>
+      <p class="price-note">Annual billing: <b>2 months free</b> · cancel anytime · 14-day money-back guarantee</p>
+
+      <!-- coupon banner -->
+      <div class="coupon reveal">
+        <div>
+          <h3>Your subscription can pay for itself.</h3>
+          <p>TraderStack members get exclusive discounts on evaluations and resets at 50+ partner prop firms — Apex, Topstep, MFFU, Tradeify and more. One reset coupon a month typically covers your plan.</p>
+        </div>
+        <div class="code">
+          <div class="lbl">Member coupon preview</div>
+          <div class="val">STACK-80OFF</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FINAL CTA ================= -->
+  <section class="final-cta">
+    <div class="wrap reveal">
+      <h2>Trade like a desk.<br>Even if it's just you.</h2>
+      <p>Set up your stack in under 10 minutes. No card required for the trial.</p>
+      <a class="btn btn-green btn-big" href="#pricing">Build my stack</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <a class="logo" href="#top" aria-label="TraderStack home">
+        <svg width="24" height="24" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="10" y="42" width="10" height="12" rx="3" fill="#F2F5F4"/>
+          <rect x="27" y="42" width="10" height="12" rx="3" fill="#F2F5F4"/>
+          <rect x="27" y="27" width="10" height="12" rx="3" fill="#F2F5F4"/>
+          <rect x="44" y="42" width="10" height="12" rx="3" fill="#F2F5F4"/>
+          <rect x="44" y="27" width="10" height="12" rx="3" fill="#F2F5F4"/>
+          <rect x="44" y="12" width="10" height="12" rx="3" fill="#1FCE8F"/>
+        </svg>
+        <span class="logo-word" style="font-size:16px"><span>Trader</span><b>Stack</b></span>
+      </a>
+      <div class="foot-links">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#">Contact</a>
+        <a href="#">Terms</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+    <p class="disclaimer">Futures, foreign exchange and derivatives trading involves substantial risk of loss and is not suitable for every investor. Past performance is not indicative of future results. TraderStack provides software tools and educational market analysis only; it does not provide investment advice, signals or recommendations, and is not a broker-dealer, commodity trading advisor or financial advisor. Hypothetical or simulated performance shown on this page is for illustration only. © 2026 TraderStack. All rights reserved.</p>
+  </div>
+</footer>
+
+<dialog id="login-modal">
+  <h3>Log in to your terminal</h3>
+  <p>Test environment — real authentication isn't wired up yet, so any email gets you straight into the terminal.</p>
+  <form id="login-form" style="display:grid; gap:14px; margin-bottom:18px;">
+    <div>
+      <label for="login-email" style="display:block; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:6px;">Email</label>
+      <input id="login-email" type="email" placeholder="you@tradingdesk.com" required
+        style="width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text); font-family:var(--sans); font-size:15px; border-radius:9px; padding:11px 12px;">
+    </div>
+    <div>
+      <label for="login-pass" style="display:block; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-bottom:6px;">Password</label>
+      <input id="login-pass" type="password" placeholder="••••••••" required
+        style="width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text); font-family:var(--sans); font-size:15px; border-radius:9px; padding:11px 12px;">
+    </div>
+    <button class="btn btn-green" type="submit">Enter terminal →</button>
+  </form>
+  <button class="btn btn-ghost" type="button" id="login-close" style="font-size:13.5px; padding:8px;">Cancel</button>
+</dialog>
+
+<script>
+  // ---------- Position size calculator ----------
+  const $ = (id) => document.getElementById(id);
+  function calc() {
+    const sel = $("c-inst");
+    const tickVal = parseFloat(sel.value);
+    const name = sel.selectedOptions[0].dataset.name;
+    const risk = Math.max(0, parseFloat($("c-risk").value) || 0);
+    const stop = Math.max(1, parseInt($("c-stop").value) || 1);
+    const accts = Math.max(1, parseInt($("c-acct").value) || 1);
+    const perContract = stop * tickVal;
+    const contracts = Math.floor(risk / perContract);
+    const used = contracts * perContract;
+    $("c-out").innerHTML = contracts +
+      '<small>' + (contracts === 1 ? "contract" : "contracts") + " of " + name + " per account</small>";
+    const fmt = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $("c-detail").innerHTML = contracts === 0
+      ? "Stop too wide for this risk.<br>Try <b>" + name + " micros</b> or a tighter stop."
+      : "Risk used: <b>" + fmt(used) + "</b> of " + fmt(risk) + "<br>" +
+        "Per contract: <b>" + fmt(perContract) + "</b><br>" +
+        "Total across " + accts + (accts === 1 ? " account" : " accounts") + ": <b>" + fmt(used * accts) + "</b>";
+  }
+  ["c-inst", "c-risk", "c-stop", "c-acct"].forEach((id) => $(id).addEventListener("input", calc));
+  calc();
+
+  // ---------- Login modal (test passthrough — real auth plugs in later) ----------
+  const modal = $("login-modal");
+  $("login-btn").addEventListener("click", () => modal.showModal());
+  $("login-close").addEventListener("click", () => modal.close());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.close(); });
+  $("login-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    window.location.href = "../ControleTrades/index.html";
+  });
+
+  // ---------- Scroll reveal ----------
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) {
+    document.querySelectorAll(".reveal").forEach((el) => el.classList.add("in"));
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+  }
+
+  // ---------- Live P&L ticker in hero mock ----------
+  if (!reduced) {
+    const cells = Array.from(document.querySelectorAll(".acc-table .pnl"));
+    const total = $("pnl-total");
+    const fmt = (n) => (n < 0 ? "−$" : "+$") + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    setInterval(() => {
+      let sum = 0;
+      cells.forEach((c) => {
+        let v = parseFloat(c.dataset.pnl);
+        v += (Math.random() - 0.47) * 12.5;
+        c.dataset.pnl = v.toFixed(2);
+        c.textContent = fmt(v);
+        c.classList.toggle("up", v >= 0);
+        c.classList.toggle("down", v < 0);
+        sum += v;
+      });
+      total.textContent = fmt(sum);
+      total.classList.toggle("up", sum >= 0);
+    }, 2200);
+  }
+</script>
+</body>
+</html>
