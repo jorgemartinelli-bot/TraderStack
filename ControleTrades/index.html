@@ -865,6 +865,7 @@
       <div class="field"><label>Alvo</label><input type="number" id="et-target" step="any"></div>
       <div class="field"><label>Preço de saída</label><input type="number" id="et-exit" step="any"></div>
       <div class="field"><label>Taxas (US$)</label><input type="number" id="et-fees" step="any"></div>
+      <div class="field" style="grid-column:1/-1"><label>Saiu antes do alvo? Por quê?</label><input type="text" id="et-reason" placeholder="opcional"></div>
     </div>
     <div class="actions" style="margin-top:14px">
       <button class="btn primary" id="et-save">Salvar</button>
@@ -944,6 +945,13 @@ const OPT_MULT = 100; // SPX/XSP/SPY: $100 por ponto de prêmio
 const DEFAULT_PREFS = {caixas:true, tecnicas:true, horarios:true, custos:true};
 const active = arr => arr.filter(x=>!x.archived);
 const normNamed = arr => (arr||[]).map(x=> typeof x==='string' ? {name:x} : x);
+// Garante que "Opções" sempre exista na lista de tipos — é ela quem liga o modo
+// de travas (SPX/XSP/SPY) no Lançar operação. Nunca some por completo: no máximo
+// fica arquivada (o usuário decide isso conscientemente, com confirmação).
+const ensureOpcoesType = opTypes => {
+  if(!opTypes.some(t=>t.name==='Opções')) opTypes.push({name:'Opções'});
+  return opTypes;
+};
 /* ---- Simulador (paper trading): conta simulada nunca entra nos números reais.
    A "simulação" é uma propriedade da CONTA (firm.simulada) — a operação em si não
    carrega o flag, ele é sempre derivado do firmId. Um único motor de lançar/encerrar
@@ -1024,6 +1032,11 @@ function rMultiple(t){
   if(!p || !r) return null;
   return p.net / r;
 }
+/* O servidor grava "Importado do Trade Copier" como valor provisório em
+   reason pra todo trade recém-sincronizado (placeholder, não é motivo de
+   saída real) — em qualquer lugar que exibe/edita reason, tratamos esse
+   texto como vazio, senão ele vaza pro "Motivo saída" das concluídas. */
+function cleanReason(t){ return (t.reason && t.reason!=='Importado do Trade Copier') ? t.reason : ''; }
 function toast(msg){
   const el=$('#toast'); el.textContent=msg; el.classList.add('show');
   clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2400);
@@ -1060,7 +1073,7 @@ function loadStateLocally(){
     if(!saved.techs) saved.techs=[];
     if(!saved.dismissedTcIds) saved.dismissedTcIds=[];
     saved.techs = normNamed(saved.techs);
-    saved.opTypes = normNamed(saved.opTypes);
+    saved.opTypes = ensureOpcoesType(normNamed(saved.opTypes));
     if(saved.seq==null) saved.seq=1;
     state = saved;
     return true;
@@ -1266,7 +1279,7 @@ async function loadStateFromServer(){
       if(!saved.techs) saved.techs=[];
       if(!saved.dismissedTcIds) saved.dismissedTcIds=[];
       saved.techs = normNamed(saved.techs);
-      saved.opTypes = normNamed(saved.opTypes);
+      saved.opTypes = ensureOpcoesType(normNamed(saved.opTypes));
       state = saved;
       stateLoadedFromServer = true;
       setSaveStatus('☁️ Carregado do servidor.');
@@ -1333,7 +1346,7 @@ function renderPending(){
       <td><small>${esc(firm?firm.name:'?')}</small></td>
       <td class="num">${copies?`<b>+${copies}</b>`:'—'}</td>
       <td><select id="pv-tech-${t.id}" style="min-width:130px">${techOpts}</select></td>
-      <td><input id="pv-reason-${t.id}" placeholder="opcional" style="min-width:140px" value="${esc(t.reason&&t.reason!=='Importado do Trade Copier'?t.reason:'')}"></td>
+      <td><input id="pv-reason-${t.id}" placeholder="opcional" style="min-width:140px" value="${esc(cleanReason(t))}"></td>
       <td style="white-space:nowrap">
         <button class="btn small" onclick="validatePending(${t.id})">✔ Validar</button>
         <button class="btn small ghost" onclick="openEditTrade(${t.id})" title="Conferir e editar os dados desta operação antes de validar">✏️</button>
@@ -1355,7 +1368,7 @@ function applyPendingValidation(t){
   const tech = techEl && techEl.value ? techEl.value : null;
   const reason = reasonEl ? reasonEl.value.trim() : '';
   t.tech = tech;
-  t.reason = reason || t.reason || '';
+  t.reason = reason || cleanReason(t);
   delete t.pending;
   let copies = 0;
   if(!t.mirror && t.tcId)
@@ -1790,6 +1803,17 @@ function renderOpen(){
 }
 
 /* ================== RENDER: CONCLUÍDAS + KPIs ================== */
+/* Cópias (mirror) da mesma decisão (mesmo tcId) ficam agrupadas sob a operação
+   líder — a linha principal aparece como se fosse uma conta só, sem somar os
+   resultados das réplicas; clicar em "🔗 +N contas" expande cada cópia com o
+   resultado individual daquela conta. Não persiste entre reloads de propósito
+   (é só um estado de exibição). */
+const expandedClosedGroups = new Set();
+function toggleClosedGroup(tcId){
+  if(expandedClosedGroups.has(tcId)) expandedClosedGroups.delete(tcId);
+  else expandedClosedGroups.add(tcId);
+  renderClosed();
+}
 function renderClosed(){
   filterBar('filters-closed', true);
   const closed = applyFilters(realTrades().filter(t=>t.exit!=null),'filters-closed')
@@ -1820,10 +1844,21 @@ function renderClosed(){
 
   if(!closed.length){ $('#tbl-closed').innerHTML='<div class="empty">Nenhuma operação concluída com os filtros atuais.</div>'; return; }
   const P = state.prefs;
-  const rows = closed.map(t=>{
+
+  // Agrupa cópias (mirror) sob a operação líder pelo tcId — a lista some da view
+  // padrão, e só aparece pelo "🔗 +N contas" expandido. Trade sem tcId (lançado
+  // manual) ou espelho órfão (líder fora do filtro) vira linha própria normal.
+  const leaderTcIds = new Set(closed.filter(t=>!t.mirror).map(t=>t.tcId).filter(Boolean));
+  const topLevel = closed.filter(t=>!t.mirror || !(t.mirrorOf && leaderTcIds.has(t.mirrorOf)));
+  const kidsOf = tcId => tcId ? closed.filter(k=>k.mirror && k.mirrorOf===tcId) : [];
+
+  const rowHtml = (t, isChild, copiesBadge) => {
     const p = pnl(t), r = rMultiple(t), spr = t.kind==='spread';
-    return `<tr>
-      <td>${fmtBR(t.date)} <span class="muted">${t.timeIn||''}${t.timeOut?'–'+t.timeOut:''}</span></td>
+    const firstCell = isChild
+      ? `<td class="muted" style="padding-left:26px">↳ ${fmtBR(t.date)} <span class="muted">${t.timeIn||''}${t.timeOut?'–'+t.timeOut:''}</span></td>`
+      : `<td>${fmtBR(t.date)} <span class="muted">${t.timeIn||''}${t.timeOut?'–'+t.timeOut:''}</span></td>`;
+    return `<tr${isChild?' style="background:var(--chip)"':''}>
+      ${firstCell}
       <td class="sym">${tradeLabel(t)}</td>
       <td class="muted">${esc(t.opType||'—')}</td>
       <td>${sideTag(t)}</td>
@@ -1834,15 +1869,27 @@ function renderClosed(){
       <td class="num ${r!=null?(r>=0?'pos':'neg'):''}">${r!=null? r.toFixed(2)+'R':'—'}</td>
       <td>${esc(firmName(t.firmId))}${P.caixas&&t.boxId?`<br><small class="muted">${esc(boxName(t.boxId))}</small>`:''}</td>
       ${P.tecnicas?`<td>${t.tech?esc(t.tech):'<span class="muted">—</span>'}</td>`:''}
-      <td class="muted" style="max-width:180px;white-space:normal">${esc(t.reason)||''}</td>
+      <td class="muted" style="max-width:180px;white-space:normal">${esc(cleanReason(t))}</td>
+      <td class="num">${copiesBadge||''}</td>
       <td style="white-space:nowrap">
         <button class="btn small ghost" onclick="openViewTrade(${t.id})" title="Ver todos os detalhes desta operação">👁</button>
         <button class="btn small danger" onclick="askDelete(${t.id})">✕</button>
       </td>
     </tr>`;
+  };
+
+  const rows = topLevel.map(t=>{
+    const kids = kidsOf(t.tcId);
+    if(!kids.length) return rowHtml(t, false, '—');
+    const expanded = expandedClosedGroups.has(t.tcId);
+    const badge = `<button class="btn small ghost" onclick="toggleClosedGroup('${t.tcId}')" title="Esta decisão foi replicada em ${kids.length} outra(s) conta(s). Cada conta tem seu próprio resultado — não é somado aqui.">${expanded?'▾':'▸'} +${kids.length}</button>`;
+    let html = rowHtml(t, false, badge);
+    if(expanded) html += kids.map(k=>rowHtml(k, true, '')).join('');
+    return html;
   }).join('');
+
   $('#tbl-closed').innerHTML = `<table>
-    <thead><tr><th>Data</th><th>Ativo</th><th>Tipo</th><th>Direção</th><th class="num">Qtd</th><th class="num">Entrada <span class="hint" data-tip="Futuros: preço de entrada. Travas de opções: crédito recebido em pontos (crd).">?</span></th><th class="num">Saída <span class="hint" data-tip="Futuros: preço de saída. Travas de opções: débito pago para fechar (dbt) — 0 se expirou sem valor.">?</span></th><th class="num">Resultado</th><th class="num">R <span class="hint" data-tip="Múltiplo do risco: resultado dividido pelo risco planejado (stop no futuro; risco máximo na trava). +2R = ganhou 2x o que arriscou.">?</span></th><th>Mesa${P.caixas?' / Caixa':''}</th>${P.tecnicas?'<th>Técnica</th>':''}<th>Motivo saída</th><th></th></tr></thead>
+    <thead><tr><th>Data</th><th>Ativo</th><th>Tipo</th><th>Direção</th><th class="num">Qtd</th><th class="num">Entrada <span class="hint" data-tip="Futuros: preço de entrada. Travas de opções: crédito recebido em pontos (crd).">?</span></th><th class="num">Saída <span class="hint" data-tip="Futuros: preço de saída. Travas de opções: débito pago para fechar (dbt) — 0 se expirou sem valor.">?</span></th><th class="num">Resultado</th><th class="num">R <span class="hint" data-tip="Múltiplo do risco: resultado dividido pelo risco planejado (stop no futuro; risco máximo na trava). +2R = ganhou 2x o que arriscou.">?</span></th><th>Mesa${P.caixas?' / Caixa':''}</th>${P.tecnicas?'<th>Técnica</th>':''}<th>Motivo saída</th><th class="num">Cópias <span class="hint" data-tip="Mesma decisão replicada em outras contas pelo Trade Copier. Clique pra ver o resultado de cada conta — não somado, cada uma é independente.">?</span></th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }
 
@@ -2730,6 +2777,7 @@ function openEditTrade(id){
   $('#et-target').value = t.target ?? '';
   $('#et-exit').value   = t.exit ?? '';
   $('#et-fees').value   = t.fees ?? '';
+  $('#et-reason').value = cleanReason(t);
   const note = $('#et-note');
   if((t.partials||[]).length){
     note.style.display='';
@@ -2753,6 +2801,7 @@ $('#et-save').addEventListener('click',()=>{
   t.target = num($('#et-target').value);
   t.exit   = num($('#et-exit').value);
   t.fees   = num($('#et-fees').value) || 0;
+  t.reason = $('#et-reason').value.trim();
   $('#overlay-edit-trade').classList.remove('open');
   toast('✅ Operação atualizada'); renderAll();
 });
@@ -2787,7 +2836,7 @@ function openViewTrade(id){
   if(p){ add('Resultado bruto', (p.gross>=0?'+':'')+fmt$(p.gross)); add('Resultado líquido', (p.net>=0?'+':'')+fmt$(p.net)); }
   if(r!=null) add('R múltiplo', r.toFixed(2)+'R');
   add('Técnica', t.tech);
-  add('Observação', t.reason);
+  add('Observação', cleanReason(t));
   if(t.tcId) add('Origem', t.mirror ? 'Cópia de seguidora (Trade Copier)' : 'Trade Copier');
   $('#vt-title').textContent = `${tradeLabel(t)} · ${t.side==='long'?'Compra':'Venda'} ${t.qty}`;
   $('#vt-body').innerHTML = `<table style="width:100%;border-collapse:collapse">${
@@ -3357,8 +3406,12 @@ function arcBox(id){ const b=state.boxes.find(x=>x.id===id); b.archived=!b.archi
 function arcTech(i){ const t=state.techs[i]; t.archived=!t.archived; afterCadChange(t.archived?'📦 Técnica arquivada':'↩ Técnica reativada'); }
 function arcOpType(i){
   const t=state.opTypes[i];
-  t.archived=!t.archived;
-  afterCadChange(t.archived?(t.name==='Opções'?'📦 Opções arquivado — o modo travas some do lançamento':'📦 Tipo arquivado'):'↩ Tipo reativado');
+  const archiving = !t.archived;
+  if(archiving && t.name==='Opções'){
+    if(!confirm('Arquivar "Opções" remove o modo de travas (SPX/XSP/SPY, perna vendida/comprada) da tela de Lançar operação. Você poderá reativar depois em Cadastros. Continuar?')) return;
+  }
+  t.archived=archiving;
+  afterCadChange(t.archived?(t.name==='Opções'?'📦 Opções arquivado — o modo travas some do lançamento até reativar aqui':'📦 Tipo arquivado'):'↩ Tipo reativado');
   if($('#f-optype').value==='') { $('#f-optype').selectedIndex=0; updateMode(); }
 }
 function delFirm(id){
@@ -3448,7 +3501,7 @@ $('#file-import').addEventListener('change',e=>{
       if(!data.favs) data.favs={fut:[], stk:[]};
       if(!data.cashflows) data.cashflows=[];
       data.techs = normNamed(data.techs);
-      data.opTypes = normNamed(data.opTypes);
+      data.opTypes = ensureOpcoesType(normNamed(data.opTypes));
       state=data;
       refreshFormSelects(); renderPrefs(); applyPrefs(); updateMode(); renderAll(); toast('⬆️ Dados importados');
     }catch(err){ toast('⚠️ Arquivo inválido'); }
