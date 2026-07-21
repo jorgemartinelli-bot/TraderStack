@@ -952,6 +952,60 @@ const ensureOpcoesType = opTypes => {
   if(!opTypes.some(t=>t.name==='Opções')) opTypes.push({name:'Opções'});
   return opTypes;
 };
+// Desfaz "mojibake" (texto com acento corrompido tipo "OpÃ§Ãµes" em vez de
+// "Opções") — bug de um servidor de sync externo que lia UTF-8 como o codepage
+// ANSI do Windows (cp1252, não Latin-1 puro — por isso a tabela 0x80-0x9F
+// abaixo; sem ela "ƒ"/"…"/aspas curvas etc. não voltam certo). Corrigido no
+// servidor em 2026-07-20, mas dados já salvos com a corrupção continuam
+// precisando disso. Pode ter várias camadas empilhadas (o bug corrompia um
+// pouco mais a cada sync); por isso repete até não sobrar mais o que desfazer
+// — TextDecoder em modo fatal lança erro assim que o texto já está limpo.
+const CP1252_EXTRA = {0x80:0x20AC,0x82:0x201A,0x83:0x0192,0x84:0x201E,0x85:0x2026,0x86:0x2020,0x87:0x2021,
+  0x88:0x02C6,0x89:0x2030,0x8A:0x0160,0x8B:0x2039,0x8C:0x0152,0x8E:0x017D,
+  0x91:0x2018,0x92:0x2019,0x93:0x201C,0x94:0x201D,0x95:0x2022,0x96:0x2013,0x97:0x2014,
+  0x98:0x02DC,0x99:0x2122,0x9A:0x0161,0x9B:0x203A,0x9C:0x0153,0x9E:0x017E,0x9F:0x0178};
+const CP1252_REV = {};
+Object.keys(CP1252_EXTRA).forEach(b=>{ CP1252_REV[CP1252_EXTRA[b]] = Number(b); });
+function cp1252ToUtf8Bytes(s){
+  const bytes = [];
+  for(const ch of s){
+    const cp = ch.codePointAt(0);
+    let byte;
+    if(cp<=0xFF && !(cp>=0x80 && cp<=0x9F)) byte = cp;
+    else if(CP1252_REV[cp]!==undefined) byte = CP1252_REV[cp];
+    else return null; // char fora do alcance de 1 byte cp1252 — não é essa corrupção
+    bytes.push(byte);
+  }
+  return bytes;
+}
+function fixMojibake(s){
+  if(typeof s!=='string' || !s) return s;
+  let out = s;
+  for(let i=0;i<6;i++){
+    const bytes = cp1252ToUtf8Bytes(out);
+    if(!bytes) break;
+    let next;
+    try{ next = new TextDecoder('utf-8', {fatal:true}).decode(new Uint8Array(bytes)); }
+    catch(e){ break; }
+    if(next===out) break;
+    out = next;
+  }
+  return out;
+}
+// Corrige nomes corrompidos em listas tipo {name} (opTypes, técnicas) e realoca
+// os trades que apontavam pro nome quebrado pro nome certo — funde com a
+// entrada correta se ela já existir, em vez de deixar duplicata.
+function healMojibakeNamed(list, trades, tradeField){
+  const toRemove = [];
+  list.forEach(item=>{
+    const fixed = fixMojibake(item.name);
+    if(fixed===item.name) return;
+    trades.forEach(t=>{ if(t[tradeField]===item.name) t[tradeField]=fixed; });
+    const canon = list.find(x=>x!==item && x.name===fixed);
+    if(canon) toRemove.push(item); else item.name = fixed;
+  });
+  return toRemove.length ? list.filter(x=>!toRemove.includes(x)) : list;
+}
 /* ---- Simulador (paper trading): conta simulada nunca entra nos números reais.
    A "simulação" é uma propriedade da CONTA (firm.simulada) — a operação em si não
    carrega o flag, ele é sempre derivado do firmId. Um único motor de lançar/encerrar
@@ -1072,8 +1126,8 @@ function loadStateLocally(){
     if(!saved.boxes) saved.boxes=[];
     if(!saved.techs) saved.techs=[];
     if(!saved.dismissedTcIds) saved.dismissedTcIds=[];
-    saved.techs = normNamed(saved.techs);
-    saved.opTypes = ensureOpcoesType(normNamed(saved.opTypes));
+    saved.techs = healMojibakeNamed(normNamed(saved.techs), saved.trades, 'tech');
+    saved.opTypes = ensureOpcoesType(healMojibakeNamed(normNamed(saved.opTypes), saved.trades, 'opType'));
     if(saved.seq==null) saved.seq=1;
     state = saved;
     return true;
@@ -1278,8 +1332,8 @@ async function loadStateFromServer(){
       if(!saved.boxes) saved.boxes=[];
       if(!saved.techs) saved.techs=[];
       if(!saved.dismissedTcIds) saved.dismissedTcIds=[];
-      saved.techs = normNamed(saved.techs);
-      saved.opTypes = ensureOpcoesType(normNamed(saved.opTypes));
+      saved.techs = healMojibakeNamed(normNamed(saved.techs), saved.trades, 'tech');
+      saved.opTypes = ensureOpcoesType(healMojibakeNamed(normNamed(saved.opTypes), saved.trades, 'opType'));
       state = saved;
       stateLoadedFromServer = true;
       setSaveStatus('☁️ Carregado do servidor.');
@@ -3500,8 +3554,8 @@ $('#file-import').addEventListener('change',e=>{
       if(!data.prefs) data.prefs={...DEFAULT_PREFS};
       if(!data.favs) data.favs={fut:[], stk:[]};
       if(!data.cashflows) data.cashflows=[];
-      data.techs = normNamed(data.techs);
-      data.opTypes = ensureOpcoesType(normNamed(data.opTypes));
+      data.techs = healMojibakeNamed(normNamed(data.techs), data.trades, 'tech');
+      data.opTypes = ensureOpcoesType(healMojibakeNamed(normNamed(data.opTypes), data.trades, 'opType'));
       state=data;
       refreshFormSelects(); renderPrefs(); applyPrefs(); updateMode(); renderAll(); toast('⬆️ Dados importados');
     }catch(err){ toast('⚠️ Arquivo inválido'); }
