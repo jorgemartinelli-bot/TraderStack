@@ -1805,31 +1805,14 @@ function renderOpen(){
 /* ================== RENDER: CONCLUÍDAS + KPIs ================== */
 /* Cópias (mirror) da mesma decisão (mesmo tcId) ficam agrupadas sob a operação
    líder — a linha principal aparece como se fosse uma conta só, sem somar os
-   resultados das réplicas; clicar em "🔗 +N contas" expande e mostra um grupo
-   por mesa (Apex, Bulenox etc. — pelo modelo de prop firm da conta, não pelo
-   nome que o usuário deu a ela). Clicar num grupo de mesa expande de novo e
-   revela o resultado individual de cada conta daquela mesa. Nada disso soma
-   resultado entre contas, é só agrupamento visual. Não persiste entre reloads
-   de propósito (é só um estado de exibição). */
+   resultados das réplicas; clicar em "🔗 +N contas" expande cada cópia com o
+   resultado individual daquela conta. Não persiste entre reloads de propósito
+   (é só um estado de exibição). */
 const expandedClosedGroups = new Set();
-const expandedMesaGroups = new Set(); // chave: tcId + '::' + nome da mesa
 function toggleClosedGroup(tcId){
   if(expandedClosedGroups.has(tcId)) expandedClosedGroups.delete(tcId);
   else expandedClosedGroups.add(tcId);
   renderClosed();
-}
-function toggleMesaGroup(key){
-  if(expandedMesaGroups.has(key)) expandedMesaGroups.delete(key);
-  else expandedMesaGroups.add(key);
-  renderClosed();
-}
-// Nome da mesa pelo modelo de prop firm (Apex, Bulenox...) quando cadastrado;
-// senão cai no nome que o usuário deu à conta (corretora ou prop sem modelo).
-function mesaLabel(firmId){
-  const f = state.firms.find(x=>x.id===firmId);
-  if(!f) return '—';
-  if(f.propTemplate && PROP_TEMPLATES[f.propTemplate]) return PROP_TEMPLATES[f.propTemplate].name;
-  return f.name;
 }
 function renderClosed(){
   filterBar('filters-closed', true);
@@ -1869,12 +1852,12 @@ function renderClosed(){
   const topLevel = closed.filter(t=>!t.mirror || !(t.mirrorOf && leaderTcIds.has(t.mirrorOf)));
   const kidsOf = tcId => tcId ? closed.filter(k=>k.mirror && k.mirrorOf===tcId) : [];
 
-  const rowHtml = (t, depth, copiesBadge) => {
+  const rowHtml = (t, isChild, copiesBadge) => {
     const p = pnl(t), r = rMultiple(t), spr = t.kind==='spread';
-    const firstCell = depth>0
-      ? `<td class="muted" style="padding-left:${10+depth*16}px">↳ ${fmtBR(t.date)} <span class="muted">${t.timeIn||''}${t.timeOut?'–'+t.timeOut:''}</span></td>`
+    const firstCell = isChild
+      ? `<td class="muted" style="padding-left:26px">↳ ${fmtBR(t.date)} <span class="muted">${t.timeIn||''}${t.timeOut?'–'+t.timeOut:''}</span></td>`
       : `<td>${fmtBR(t.date)} <span class="muted">${t.timeIn||''}${t.timeOut?'–'+t.timeOut:''}</span></td>`;
-    return `<tr${depth>0?' style="background:var(--chip)"':''}>
+    return `<tr${isChild?' style="background:var(--chip)"':''}>
       ${firstCell}
       <td class="sym">${tradeLabel(t)}</td>
       <td class="muted">${esc(t.opType||'—')}</td>
@@ -1895,33 +1878,13 @@ function renderClosed(){
     </tr>`;
   };
 
-  // Linha-resumo de um grupo de mesa (ex.: "Apex — 2 contas"), com o mesmo
-  // botão de expandir/recolher usado na líder. Não é um trade — colspan cobre
-  // Tipo…Cópias, deixando Data/Ativo pro nome da mesa e Ações em branco.
-  const mesaGroupRowHtml = (mesa, accs, mesaKey) => {
-    const expanded = expandedMesaGroups.has(mesaKey);
-    const badge = `<button class="btn small ghost" onclick="toggleMesaGroup('${mesaKey}')" title="${accs.length} conta(s) da ${esc(mesa)} replicaram esta decisão — cada uma com seu próprio resultado.">${expanded?'▾':'▸'} ${accs.length} conta${accs.length===1?'':'s'}</button>`;
-    let html = `<tr style="background:var(--chip)">
-      <td class="muted" style="padding-left:26px" colspan="2">↳ <b>${esc(mesa)}</b></td>
-      <td class="muted" colspan="${10+(P.tecnicas?1:0)}">${badge}</td>
-      <td></td>
-    </tr>`;
-    if(expanded) html += accs.map(k=>rowHtml(k, 2, '')).join('');
-    return html;
-  };
-
   const rows = topLevel.map(t=>{
     const kids = kidsOf(t.tcId);
-    if(!kids.length) return rowHtml(t, 0, '—');
+    if(!kids.length) return rowHtml(t, false, '—');
     const expanded = expandedClosedGroups.has(t.tcId);
-    const badge = `<button class="btn small ghost" onclick="toggleClosedGroup('${t.tcId}')" title="Esta decisão foi replicada em ${kids.length} outra(s) conta(s), agrupadas por mesa. Cada conta tem seu próprio resultado — não é somado aqui.">${expanded?'▾':'▸'} +${kids.length}</button>`;
-    let html = rowHtml(t, 0, badge);
-    if(expanded){
-      // agrupa as cópias por mesa (Apex, Bulenox etc.) em vez de listar conta a conta direto
-      const byMesa = {};
-      kids.forEach(k=>{ const m=mesaLabel(k.firmId); (byMesa[m]=byMesa[m]||[]).push(k); });
-      html += Object.entries(byMesa).map(([mesa, accs])=> mesaGroupRowHtml(mesa, accs, t.tcId+'::'+mesa)).join('');
-    }
+    const badge = `<button class="btn small ghost" onclick="toggleClosedGroup('${t.tcId}')" title="Esta decisão foi replicada em ${kids.length} outra(s) conta(s). Cada conta tem seu próprio resultado — não é somado aqui.">${expanded?'▾':'▸'} +${kids.length}</button>`;
+    let html = rowHtml(t, false, badge);
+    if(expanded) html += kids.map(k=>rowHtml(k, true, '')).join('');
     return html;
   }).join('');
 
